@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Web Bug Nomor — by Andre</title>
+<style>
+  body {
+    margin:0;
+    font-family: system-ui, sans-serif;
+    color:#fff;
+    background: radial-gradient(circle at top left, #7c3aed, #2e1065);
+    display:grid;
+    place-items:center;
+    height:100vh;
+  }
+  .card {
+    background: rgba(255,255,255,.08);
+    padding: 26px;
+    border-radius: 14px;
+    text-align: center;
+    box-shadow: 0 0 22px rgba(138,43,226,.55);
+  }
+  .input-row { display:flex; gap:12px; margin-bottom:18px; justify-content:center; }
+  input {
+    padding: 12px;
+    border-radius: 10px;
+    border: none;
+    width: 230px;
+  }
+  .side-square {
+    width: 32px; height: 32px;
+    background: #000;
+    border-radius: 8px;
+    cursor: pointer;
+    position: relative;
+  }
+  .side-square.checked::after {
+    content: "✔";
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+  }
+  .btn-row { display:flex; gap:10px; justify-content:center; margin-bottom:14px; flex-wrap:wrap; }
+  button {
+    padding:10px 16px;
+    border:none;
+    border-radius:10px;
+    font-weight:700;
+    color:#fff;
+    background:linear-gradient(90deg,#3b82f6,#9333ea);
+    box-shadow:0 0 12px rgba(0,162,255,0.9);
+    cursor:pointer;
+  }
+  .player-wrap {
+    position:fixed;
+    inset:0;
+    background:#000;
+    z-index:9999;
+  }
+  canvas#screen {
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    display:block;
+  }
+  .blocker {
+    position:absolute;
+    inset:0;
+    z-index:10000;
+  }
+  .denied {
+    position:absolute;
+    inset:0;
+    background:rgba(0,0,0,0.9);
+    color:red;
+    font-size:2rem;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:bold;
+    z-index:10001;
+  }
+</style>
+</head>
+<body>
+  <div class="card" id="mainCard">
+    <h1>Web Bug Nomor — by Andre</h1>
+    <div class="input-row">
+      <input type="tel" placeholder="Masukkan nomor" id="targetNumber" inputmode="numeric">
+      <span class="side-square" id="lockNumber"></span>
+    </div>
+    <div class="btn-row">
+      <button>Invisible bug</button>
+      <button>Forclose bug</button>
+    </div>
+    <div>
+      <button id="sendBtn">Kirim Bug</button>
+    </div>
+  </div>
+
+<script>
+const prankVideoPath = 'video/prank.mp4';
+
+// Lock nomor
+const lockSquare = document.getElementById('lockNumber');
+const numberInput = document.getElementById('targetNumber');
+lockSquare.addEventListener('click', () => {
+  lockSquare.classList.toggle('checked');
+  numberInput.disabled = lockSquare.classList.contains('checked');
+});
+
+document.getElementById('sendBtn').addEventListener('click', () => {
+  if (!numberInput.value.trim()) {
+    alert('Masukkan nomor terlebih dahulu!');
+    return;
+  }
+  startCanvasPrank(prankVideoPath);
+});
+
+function startCanvasPrank(src) {
+  const wrap = document.createElement('div');
+  wrap.className = 'player-wrap';
+  wrap.innerHTML = '<canvas id="screen"></canvas><div class="blocker"></div>';
+  document.body.innerHTML = '';
+  document.body.appendChild(wrap);
+
+  const canvas = wrap.querySelector('#screen');
+  const ctx = canvas.getContext('2d');
+  const vid = document.createElement('video');
+  vid.src = src;
+  vid.preload = 'auto';
+  vid.playsInline = true;
+  vid.crossOrigin = 'anonymous';
+  vid.muted = false;
+  vid.setAttribute('webkit-playsinline','');
+  vid.style.display = 'none';
+  wrap.appendChild(vid);
+
+  const fit = () => {
+    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio||1));
+    canvas.width = Math.floor(window.innerWidth * dpr);
+    canvas.height = Math.floor(window.innerHeight * dpr);
+  };
+  window.addEventListener('resize', fit);
+  fit();
+
+  function draw() {
+    if (vid.readyState >= 2) {
+      const vw = vid.videoWidth || 16, vh = vid.videoHeight || 9;
+      const cw = canvas.width, ch = canvas.height;
+      const scale = Math.max(cw / vw, ch / vh);
+      const dw = Math.floor(vw * scale), dh = Math.floor(vh * scale);
+      const dx = Math.floor((cw - dw) / 2), dy = Math.floor((ch - dh) / 2);
+      ctx.drawImage(vid, dx, dy, dw, dh);
+    }
+    requestAnimationFrame(draw);
+  }
+  vid.addEventListener('canplay', () => { vid.play().catch(()=>{}); });
+  vid.play().catch(()=>{});
+  requestAnimationFrame(draw);
+
+  // Blok keyboard
+  window.addEventListener('keydown', e => e.preventDefault());
+  window.addEventListener('keypress', e => e.preventDefault());
+  window.addEventListener('keyup', e => e.preventDefault());
+
+  // Cegah klik di luar
+  const blocker = wrap.querySelector('.blocker');
+  ['click','touchstart','pointerdown','contextmenu'].forEach(ev=>{
+    blocker.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); });
+  });
+
+  // Jika tab kehilangan fokus → restart video
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      vid.currentTime = 0;
+      vid.play().catch(()=>{});
+    }
+  });
+
+  // Kalau user coba keluar → layer akses ditolak
+  window.addEventListener('blur', () => {
+    const denied = document.createElement('div');
+    denied.className = 'denied';
+    denied.textContent = 'Akses Ditolak untuk keluar';
+    document.body.appendChild(denied);
+  });
+}
+</script>
+</body>
+</html>
